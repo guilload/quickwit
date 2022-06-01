@@ -5,7 +5,7 @@ sidebar_position: 3
 
 Setting up a Quickwit cluster on AWS requires the configuration of three elements:
 - AWS credentials
-- AWS Region
+- AWS region
 - Network configuration
 
 ## AWS credentials
@@ -23,9 +23,9 @@ When starting a node, Quickwit attempts to find AWS credentials using the creden
 If all these possibilities are exhausted, an error is returned.
 
 
-## AWS Region
+## AWS region
 
-Quickwit attempts to find an AWS Region in multiple locations and with the following order of precedence:
+Quickwit attempts to find an AWS region in multiple locations and with the following order of precedence:
 
 1. Environment variables (`AWS_REGION` then `AWS_DEFAULT_REGION`)
 
@@ -36,9 +36,36 @@ Quickwit attempts to find an AWS Region in multiple locations and with the follo
 4. Default value: `us-east-1`
 
 
+## IAM permissions
+
+### Amazon S3
+
+- `ListObjects`
+- `GetObject`
+
+You can run the following commands to verify that AWS credentials, region, and IAM permissions are property configured:
+
+```bash
+MY_BUCKET=<bucket name>
+aws s3 ls "$MY_BUCKET"
+echo "Hello, World!" | aws s3 cp - "$MY_BUCKET/hello"
+aws s3 ls "$MY_BUCKET/hello"
+aws s3 cp "$MY_BUCKET/hello" -
+aws s3 rm "$MY_BUCKET/hello"
+```
+
+### Amazon Kinesis
+
+```bash
+MY_STREAM=<stream name>
+```
+
+
+
+
 :::note
 
-AWS credentials or Region resolution may take a few seconds, especially if the Amazon EC2 instance metadata service is slow or unavailable.
+AWS credentials or region resolution may take a few seconds, especially if the Amazon EC2 instance metadata service is slow or unavailable.
 
 :::
 
