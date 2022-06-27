@@ -1,12 +1,32 @@
 FROM alpine:3 AS builder
 
-COPY quickwit-*-unknown-linux-musl.tar.gz ./
-RUN tar -xzf quickwit-*-$(cat /etc/apk/arch)-unknown-linux-musl.tar.gz
-RUN mv ./quickwit-*/* ./
-RUN chmod 744 ./quickwit
+RUN apk add --update make npm
+
+# Build UI
+COPY quickwit-ui /quickwit/quickwit-ui
+
+WORKDIR /quickwit/quickwit-ui
+
+RUN echo "Building Quickwit UI" \
+    && npm install --location=global yarn \
+    && make install build
+
+# Build workspace
+COPY . /quickwit
+
+WORKDIR /quickwit
+
+RUN echo "Building workspace with feature(s) '$CARGO_FEATURES' and profile '$CARGO_PROFILE'" \
+    && cargo build \
+        --features $CARGO_FEATURES \
+        $(test "$CARGO_PROFILE" = "release" && echo "--release") \
+    && echo "Copying binaries to /quickwit/bin" \
+    && mkdir -p /quickwit/bin \
+    && find target/$CARGO_PROFILE -maxdepth 1 -perm /a+x -type f -exec mv {} /quickwit/bin \;
 
 # Change the default configuration file in order to make the REST,
-# gRPC and gossip services accessible outside of Docker.
+# gRPC, and gossip services accessible outside of Docker container.
+COPY ./config/quickwit.yaml ./config/quickwit.yaml
 RUN sed -i 's/#listen_address: 127.0.0.1/listen_address: 0.0.0.0/g' ./config/quickwit.yaml
 
 
