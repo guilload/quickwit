@@ -71,8 +71,8 @@ async fn get_all_splits(
     index_id: String,
     index_service: Arc<IndexService>,
 ) -> Result<impl warp::Reply, Infallible> {
-    info!(index_id = %index_id, "get-index");
-    let splits = index_service.get_all_splits(&index_id).await;
+    info!(index_id = %index_id, "get-splits");
+    let splits = index_service.list_splits(&index_id).await;
     Ok(Format::default().make_rest_reply_non_serializable_error(splits))
 }
 
@@ -89,7 +89,10 @@ async fn get_indexes_metadatas(
     index_service: Arc<IndexService>,
 ) -> Result<impl warp::Reply, Infallible> {
     info!("get-indexes-metadatas");
-    let index_metadata = index_service.get_indexes().await.map_err(SearchError::from);
+    let index_metadata = index_service
+        .list_indexes()
+        .await
+        .map_err(SearchError::from);
     Ok(Format::default().make_rest_reply_non_serializable_error(index_metadata))
 }
 

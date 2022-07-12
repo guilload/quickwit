@@ -38,6 +38,7 @@ use quickwit_storage::{StorageResolverError, StorageUriResolver};
 use tantivy::time::OffsetDateTime;
 use thiserror::Error;
 use tracing::{error, info};
+use quickwit_metastore::SplitFilters;
 
 #[derive(Error, Debug)]
 pub enum IndexServiceError {
@@ -77,16 +78,10 @@ impl IndexService {
         Ok(index_metadata)
     }
 
-    /// Get all splits from index `index_id`.
-    pub async fn get_all_splits(&self, index_id: &str) -> Result<Vec<Split>, IndexServiceError> {
-        let splits = self.metastore.list_all_splits(index_id).await?;
-        Ok(splits)
-    }
-
     /// Get all indexes.
-    pub async fn get_indexes(&self) -> anyhow::Result<Vec<IndexMetadata>> {
-        let indexes_metadatas = self.metastore.list_indexes_metadatas().await?;
-        Ok(indexes_metadatas)
+    pub async fn list_indexes(&self) -> anyhow::Result<Vec<IndexMetadata>> {
+        let indexes = self.metastore.list_indexes().await?;
+        Ok(indexes)
     }
 
     /// Creates an index from `IndexConfig`.
@@ -160,44 +155,40 @@ impl IndexService {
         let storage = self.storage_resolver.resolve(&index_uri)?;
 
         if dry_run {
-            let all_splits = self
+            return Ok(self
                 .metastore
-                .list_all_splits(index_id)
+                .list_splits(index_id, &SplitFilters::builder().build())
                 .await?
                 .into_iter()
-                .map(|metadata| metadata.split_metadata)
-                .collect::<Vec<_>>();
-
-            let file_entries_to_delete: Vec<FileEntry> =
-                all_splits.iter().map(FileEntry::from).collect();
-            return Ok(file_entries_to_delete);
+                .map(|split| FileEntry::from(&split.split_metadata))
+                .collect::<Vec<_>>());
         }
-
-        // Schedule staged and published splits for deletion.
-        let staged_splits = self
+        let split_filters = SplitFilters::builder()
+            .split_state(SplitState::Staged)
+            .split_state(SplitState::Published)
+            .build();
+        let candidate_splits = self
             .metastore
-            .list_splits(index_id, SplitState::Staged, None, None)
+            .list_splits(index_id, &split_filters)
             .await?;
-        let published_splits = self
-            .metastore
-            .list_splits(index_id, SplitState::Published, None, None)
-            .await?;
-        let split_ids = staged_splits
+        let candidate_split_ids = candidate_splits
             .iter()
-            .chain(published_splits.iter())
             .map(|meta| meta.split_id())
             .collect::<Vec<_>>();
         self.metastore
-            .mark_splits_for_deletion(index_id, &split_ids)
+            .mark_splits_for_deletion(index_id, &candidate_split_ids)
             .await?;
 
         // Select splits to delete
+        let split_filters = SplitFilters::builder()
+            .split_state(SplitState::MarkedForDeletion)
+            .build();
         let splits_to_delete = self
             .metastore
-            .list_splits(index_id, SplitState::MarkedForDeletion, None, None)
+            .list_splits(index_id, &split_filters)
             .await?
             .into_iter()
-            .map(|metadata| metadata.split_metadata)
+            .map(|split| split.split_metadata)
             .collect::<Vec<_>>();
 
         let split_store = IndexingSplitStore::create_with_no_local_store(storage);
@@ -218,7 +209,7 @@ impl IndexService {
     /// * `index_id` - The target index Id.
     /// * `grace_period` -  Threshold period after which a staged split can be garbage collected.
     /// * `dry_run` - Should this only return a list of affected files without performing deletion.
-    pub async fn garbage_collect_index(
+    pub async fn run_garbage_collection(
         &self,
         index_id: &str,
         grace_period: Duration,
@@ -255,7 +246,7 @@ impl IndexService {
     pub async fn reset_index(&self, index_id: &str) -> anyhow::Result<()> {
         let index_metadata = self.metastore.index_metadata(index_id).await?;
         let storage = self.storage_resolver.resolve(&index_metadata.index_uri)?;
-        let splits = self.metastore.list_all_splits(index_id).await?;
+        let splits = self.metastore.list_splits(index_id, &SplitFilters::builder().build()).await?;
         let split_ids: Vec<&str> = splits.iter().map(|split| split.split_id()).collect();
         self.metastore
             .mark_splits_for_deletion(index_id, &split_ids)
@@ -266,7 +257,7 @@ impl IndexService {
             .collect();
         let split_store = IndexingSplitStore::create_with_no_local_store(storage);
         // FIXME: return an error.
-        if let Err(err) = delete_splits_with_files(
+        if let Err(error) = delete_splits_with_files(
             index_id,
             split_store,
             self.metastore.clone(),
@@ -275,7 +266,7 @@ impl IndexService {
         )
         .await
         {
-            error!(metastore_uri = %self.metastore.uri(), index_id = %index_id, error = ?err, "Not all split files could be deleted during garbage collection.");
+            error!(metastore_uri=%self.metastore.uri(), index_id=%index_id, error=?error, "Failed to delete all splits during garbage collection.");
         }
         Ok(())
     }

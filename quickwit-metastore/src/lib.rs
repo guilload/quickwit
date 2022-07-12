@@ -42,7 +42,9 @@ pub use metastore::file_backed_metastore::FileBackedMetastore;
 pub use metastore::postgresql_metastore::PostgresqlMetastore;
 #[cfg(feature = "testsuite")]
 pub use metastore::MockMetastore;
-pub use metastore::{file_backed_metastore, IndexMetadata, Metastore};
+pub use metastore::{
+    file_backed_metastore, Expr, IndexMetadata, Metastore, SplitFilters, SplitsFiltersBuilder,
+};
 pub use metastore_resolver::{
     quickwit_metastore_uri_resolver, MetastoreFactory, MetastoreUriResolver,
 };

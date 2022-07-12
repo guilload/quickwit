@@ -30,7 +30,7 @@ use quickwit_actors::{
 };
 use quickwit_config::{build_doc_mapper, IndexingSettings, SourceConfig};
 use quickwit_doc_mapper::DocMapper;
-use quickwit_metastore::{IndexMetadata, Metastore, MetastoreError, SplitState};
+use quickwit_metastore::{IndexMetadata, Metastore, MetastoreError, SplitFilters, SplitState};
 use quickwit_storage::Storage;
 use tokio::join;
 use tracing::{debug, error, info, info_span, instrument, Span};
@@ -218,10 +218,13 @@ impl IndexingPipeline {
             },
             merge_policy.clone(),
         )?;
+        let split_filters = SplitFilters::builder()
+            .split_state(SplitState::Published)
+            .build();
         let published_splits = self
             .params
             .metastore
-            .list_splits(&self.params.index_id, SplitState::Published, None, None)
+            .list_splits(&self.params.index_id, &split_filters)
             .await?
             .into_iter()
             .map(|split| split.split_metadata)

@@ -126,7 +126,7 @@ impl SplitMetadata {
 }
 
 /// A split state.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SplitState {
     /// The split is almost ready. Some of its files may have been uploaded in the storage.
     Staged,

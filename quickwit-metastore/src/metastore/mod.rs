@@ -24,6 +24,7 @@ pub mod postgresql_metastore;
 #[cfg(feature = "postgres")]
 mod postgresql_model;
 
+use std::collections::HashSet;
 use std::ops::Range;
 
 use async_trait::async_trait;
@@ -61,6 +62,135 @@ use crate::{MetastoreResult, Split, SplitMetadata, SplitState};
 /// storage right after marking it for deletion. A CLI client may delete files right away, but a
 /// more serious deployment should probably only delete those files after a grace period so that the
 /// running search queries can complete.
+#[derive(Clone, Debug)]
+pub enum Expr<T> {
+    Eq(T),
+    Gt(T),
+    Gte(T),
+    Lt(T),
+    Lte(T),
+}
+
+#[derive(Clone, Debug)]
+pub struct SplitFilters {
+    split_states: Option<HashSet<SplitState>>,
+    start_timestamp: Option<i64>,
+    end_timestamp: Option<i64>,
+    create_timestamp: Option<Expr<i64>>,
+    update_timestamp: Option<Expr<i64>>,
+    publish_timestamp: Option<Expr<i64>>,
+    tags: Option<TagFilterAst>,
+}
+
+impl SplitFilters {
+    pub fn builder() -> SplitsFiltersBuilder {
+        SplitsFiltersBuilder::new()
+    }
+
+    pub fn by_state(&self, split: &Split) -> bool {
+        self.split_states
+            .as_ref()
+            .map(|states| states.contains(&split.split_state))
+            .unwrap_or(true)
+    }
+
+    pub fn by_tags(&self, split: &Split) -> bool {
+        self.tags
+            .as_ref()
+            .map(|ast| ast.evaluate(&split.split_metadata.tags))
+            .unwrap_or(true)
+    }
+
+    pub fn by_publish_timestamp(&self, split: &Split) -> bool {
+        self.publish_timestamp
+            .as_ref()
+            .map(|expr| match expr {
+                Expr::Eq(ts) => &split.update_timestamp == ts,
+                Expr::Gt(ts) => &split.update_timestamp > ts,
+                Expr::Gte(ts) => &split.update_timestamp >= ts,
+                Expr::Lt(ts) => &split.update_timestamp < ts,
+                Expr::Lte(ts) => &split.update_timestamp <= ts,
+            })
+            .unwrap_or(true)
+    }
+}
+
+pub struct SplitsFiltersBuilder {
+    split_states: HashSet<SplitState>,
+    start_timestamp: Option<i64>,
+    end_timestamp: Option<i64>,
+    create_timestamp: Option<Expr<i64>>,
+    update_timestamp: Option<Expr<i64>>,
+    publish_timestamp: Option<Expr<i64>>,
+    tags: Option<TagFilterAst>,
+}
+
+impl SplitsFiltersBuilder {
+    pub fn new() -> Self {
+        Self {
+            split_states: HashSet::new(),
+            start_timestamp: None,
+            end_timestamp: None,
+            create_timestamp: None,
+            update_timestamp: None,
+            publish_timestamp: None,
+            tags: None,
+        }
+    }
+
+    pub fn build(self) -> SplitFilters {
+        let split_states = if !self.split_states.is_empty() {
+            Some(self.split_states)
+        } else {
+            None
+        };
+        SplitFilters {
+            split_states,
+            start_timestamp: self.start_timestamp,
+            end_timestamp: self.end_timestamp,
+            create_timestamp: self.create_timestamp,
+            update_timestamp: self.update_timestamp,
+            publish_timestamp: self.publish_timestamp,
+            tags: self.tags,
+        }
+    }
+
+    pub fn split_state(mut self, state: SplitState) -> Self {
+        self.split_states.insert(state);
+        self
+    }
+
+    pub fn start_timestamp(mut self, start_timestamp: i64) -> Self {
+        self.start_timestamp = Some(start_timestamp);
+        self
+    }
+
+    pub fn end_timestamp(mut self, end_timestamp: i64) -> Self {
+        self.end_timestamp = Some(end_timestamp);
+        self
+    }
+
+    pub fn created_timestamp(mut self, create_timestamp_expr: Expr<i64>) -> Self {
+        self.create_timestamp = Some(create_timestamp_expr);
+        self
+    }
+
+    pub fn update_timestamp(mut self, update_timestamp_expr: Expr<i64>) -> Self {
+        self.update_timestamp = Some(update_timestamp_expr);
+        self
+    }
+
+    pub fn publish_timestamp(mut self, publish_timestamp_expr: Expr<i64>) -> Self {
+        self.publish_timestamp = Some(publish_timestamp_expr);
+        self
+    }
+
+    pub fn tags(mut self, tags: TagFilterAst) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+}
+
 #[cfg_attr(any(test, feature = "testsuite"), mockall::automock)]
 #[async_trait]
 pub trait Metastore: Send + Sync + 'static {
@@ -83,7 +213,7 @@ pub trait Metastore: Send + Sync + 'static {
     ///
     /// This API lists the indexes stored in the metastore and returns a collection of
     /// [`IndexMetadata`].
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>>;
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>>;
 
     /// Returns the [`IndexMetadata`] for a given index.
     /// TODO consider merging with list_splits to remove one round-trip
@@ -143,15 +273,8 @@ pub trait Metastore: Send + Sync + 'static {
     async fn list_splits(
         &self,
         index_id: &str,
-        split_state: SplitState,
-        time_range: Option<Range<i64>>,
-        tags: Option<TagFilterAst>,
+        split_filters: &SplitFilters,
     ) -> MetastoreResult<Vec<Split>>;
-
-    /// Lists all the splits without filtering.
-    ///
-    /// Returns a list of all splits currently known to the metastore regardless of their state.
-    async fn list_all_splits(&self, index_id: &str) -> MetastoreResult<Vec<Split>>;
 
     /// Marks a list of splits for deletion.
     ///

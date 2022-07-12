@@ -57,7 +57,7 @@ use quickwit_cluster::Cluster;
 use quickwit_config::{build_doc_mapper, QuickwitConfig, SEARCHER_CONFIG_INSTANCE};
 use quickwit_doc_mapper::tag_pruning::extract_tags_from_query;
 use quickwit_doc_mapper::DocMapper;
-use quickwit_metastore::{Metastore, SplitMetadata, SplitState};
+use quickwit_metastore::{Metastore, SplitFilters, SplitMetadata, SplitState};
 use quickwit_proto::{PartialHit, SearchRequest, SearchResponse, SplitIdAndFooterOffsets};
 use quickwit_storage::StorageUriResolver;
 use serde_json::Value as JsonValue;
@@ -138,20 +138,20 @@ async fn list_relevant_splits(
     search_request: &SearchRequest,
     metastore: &dyn Metastore,
 ) -> crate::Result<Vec<SplitMetadata>> {
-    let time_range_opt =
-        extract_time_range(search_request.start_timestamp, search_request.end_timestamp);
-    let tags_filter = extract_tags_from_query(&search_request.query)?;
-    let split_metas = metastore
-        .list_splits(
-            &search_request.index_id,
-            SplitState::Published,
-            time_range_opt,
-            tags_filter,
-        )
+    let split_filters = SplitFilters::builder()
+        // .start_timestamp(search_request.start_timestamp)
+        // .end_timestamp(search_request.start_timestamp)
+        // .tags()
+        .build();
+    // let time_range_opt =
+    //     extract_time_range(search_request.start_timestamp, search_request.end_timestamp);
+    // let tags_filter = extract_tags_from_query(&search_request.query)?;
+    let splits = metastore
+        .list_splits(&search_request.index_id, &split_filters)
         .await?;
-    Ok(split_metas
+    Ok(splits
         .into_iter()
-        .map(|metadata| metadata.split_metadata)
+        .map(|split| split.split_metadata)
         .collect::<Vec<_>>())
 }
 

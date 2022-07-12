@@ -35,7 +35,7 @@ use tracing::log::LevelFilter;
 use tracing::{debug, error, instrument, warn};
 
 use crate::metastore::postgresql_model::{Index, IndexIdSplitIdRow};
-use crate::metastore::{postgresql_model, CheckpointDelta};
+use crate::metastore::{postgresql_model, CheckpointDelta, SplitFilters};
 use crate::{
     IndexMetadata, Metastore, MetastoreError, MetastoreFactory, MetastoreResolverError,
     MetastoreResult, Split, SplitMetadata, SplitState,
@@ -201,9 +201,7 @@ async fn mark_splits_for_deletion(
 async fn list_splits_helper(
     tx: &mut Transaction<'_, Postgres>,
     index_id: &str,
-    state_opt: Option<SplitState>,
-    time_range_opt: Option<Range<i64>>,
-    tags_opt: Option<TagFilterAst>,
+    filters: &SplitFilters,
 ) -> MetastoreResult<Vec<Split>> {
     let mut sql = r#"
         SELECT *
@@ -211,21 +209,23 @@ async fn list_splits_helper(
         WHERE index_id = $1
     "#
     .to_string();
-    if let Some(state) = state_opt {
-        sql.push_str(&format!(" AND split_state = '{}'", state.as_str()));
-    }
-    if let Some(time_range) = time_range_opt {
+    if let Some(states) = &filters.split_states {
         sql.push_str(&format!(
-            " AND (time_range_end >= {} OR time_range_end IS NULL) ",
-            time_range.start
-        ));
-        sql.push_str(&format!(
-            " AND (time_range_start < {} OR time_range_start IS NULL) ",
-            time_range.end
+            " AND split_state = ANY({})",
+            states.iter().join(",")
         ));
     }
-
-    if let Some(tags) = tags_opt {
+    // if let Some(time_range) = time_range_opt {
+    //     sql.push_str(&format!(
+    //         " AND (time_range_end >= {} OR time_range_end IS NULL) ",
+    //         time_range.start
+    //     ));
+    //     sql.push_str(&format!(
+    //         " AND (time_range_start < {} OR time_range_start IS NULL) ",
+    //         time_range.end
+    //     ));
+    // }
+    if let Some(tags) = &filters.tags {
         sql.push_str(" AND (");
         sql.push_str(&tags_filter_expression_helper(tags));
         sql.push_str(") ");
@@ -423,7 +423,7 @@ impl Metastore for PostgresqlMetastore {
         Ok(())
     }
 
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>> {
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>> {
         run_with_tx!(self.connection_pool, tx, {
             let indexes: Vec<Index> = sqlx::query_as::<_, Index>("SELECT * FROM indexes")
                 .fetch_all(tx)
@@ -606,19 +606,10 @@ impl Metastore for PostgresqlMetastore {
     async fn list_splits(
         &self,
         index_id: &str,
-        state: SplitState,
-        time_range_opt: Option<Range<i64>>,
-        tags: Option<TagFilterAst>,
+        filters: &SplitFilters,
     ) -> MetastoreResult<Vec<Split>> {
         run_with_tx!(self.connection_pool, tx, {
-            list_splits_helper(tx, index_id, Some(state), time_range_opt, tags).await
-        })
-    }
-
-    #[instrument(skip(self))]
-    async fn list_all_splits(&self, index_id: &str) -> MetastoreResult<Vec<Split>> {
-        run_with_tx!(self.connection_pool, tx, {
-            list_splits_helper(tx, index_id, None, None, None).await
+            list_splits_helper(tx, index_id, filters).await
         })
     }
 
@@ -745,7 +736,7 @@ fn generate_dollar_guard(s: &str) -> String {
 
 /// Takes a tag filters AST and returns a sql expression that can be used as
 /// a filter.
-fn tags_filter_expression_helper(tags: TagFilterAst) -> String {
+fn tags_filter_expression_helper(tags: &TagFilterAst) -> String {
     match tags {
         TagFilterAst::And(child_asts) => {
             if child_asts.is_empty() {
@@ -769,7 +760,7 @@ fn tags_filter_expression_helper(tags: TagFilterAst) -> String {
         }
         TagFilterAst::Tag { is_present, tag } => {
             let dollar_guard = generate_dollar_guard(&tag);
-            if is_present {
+            if *is_present {
                 format!("${dollar_guard}${tag}${dollar_guard}$ = ANY(tags)")
             } else {
                 format!("NOT (${dollar_guard}${tag}${dollar_guard}$ = ANY(tags))")

@@ -75,7 +75,7 @@ pub async fn start_indexer_service(
     );
     let (indexer_service_mailbox, _) = universe.spawn_actor(indexing_server).spawn();
 
-    let index_metadatas = metastore.list_indexes_metadatas().await?;
+    let index_metadatas = metastore.list_indexes().await?;
     info!(index_ids = %index_metadatas.iter().map(|im| &im.index_id).join(", "), "Spawning indexing pipeline(s).");
 
     for index_metadata in index_metadatas {

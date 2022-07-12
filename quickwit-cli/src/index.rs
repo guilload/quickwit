@@ -518,7 +518,7 @@ pub async fn list_index_cli(args: ListIndexesArgs) -> anyhow::Result<()> {
         .metastore_uri
         .unwrap_or_else(|| quickwit_config.metastore_uri());
     let metastore = metastore_uri_resolver.resolve(&metastore_uri).await?;
-    let indexes = metastore.list_indexes_metadatas().await?;
+    let indexes = metastore.list_indexes().await?;
     let index_table = make_list_indexes_table(indexes);
 
     println!();
@@ -1005,7 +1005,7 @@ pub async fn garbage_collect_index_cli(args: GarbageCollectIndexArgs) -> anyhow:
         quickwit_config.default_index_root_uri(),
     );
     let deleted_files = index_service
-        .garbage_collect_index(&args.index_id, args.grace_period, args.dry_run)
+        .run_garbage_collection(&args.index_id, args.grace_period, args.dry_run)
         .await?;
     if deleted_files.is_empty() {
         println!("No dangling files to garbage collect.");

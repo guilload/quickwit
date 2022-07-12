@@ -181,7 +181,7 @@ async fn check_is_configured_for_cluster(
              PostgreSQL metastore instead."
         );
     }
-    for index_metadata in metastore.list_indexes_metadatas().await? {
+    for index_metadata in metastore.list_indexes().await? {
         let index_uri = Uri::try_new(&index_metadata.index_uri)?;
         if index_uri.protocol() == FILE_PROTOCOL {
             anyhow::bail!(

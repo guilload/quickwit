@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::checkpoint::CheckpointDelta;
+use crate::metastore::SplitFilters;
 use crate::{IndexMetadata, MetastoreError, MetastoreResult, Split, SplitMetadata, SplitState};
 
 /// A `FileBackedIndex` object carries an index metadata and its split metadata.
@@ -296,43 +297,25 @@ impl FileBackedIndex {
         Ok(())
     }
 
-    pub(crate) fn list_splits(
-        &self,
-        state: SplitState,
-        time_range_opt: Option<Range<i64>>,
-        tags_filter: Option<TagFilterAst>,
-    ) -> MetastoreResult<Vec<Split>> {
-        let time_range_filter = |split: &&Split| match (
-            time_range_opt.as_ref(),
-            split.split_metadata.time_range.as_ref(),
-        ) {
-            (Some(filter_time_range), Some(split_time_range)) => {
-                !is_disjoint(filter_time_range, split_time_range)
-            }
-            _ => true, // Return `true` if `time_range` is omitted or the split has no time range.
-        };
-
-        let tag_filter = |split: &&Split| {
-            tags_filter
-                .as_ref()
-                .map(|tags_filter_ast| tags_filter_ast.evaluate(&split.split_metadata.tags))
-                .unwrap_or(true)
-        };
+    pub(crate) fn list_splits(&self, filters: &SplitFilters) -> MetastoreResult<Vec<Split>> {
+        // let time_range_filter = |split: &&Split| match (
+        //     time_range_opt.as_ref(),
+        //     split.split_metadata.time_range.as_ref(),
+        // ) {
+        //     (Some(filter_time_range), Some(split_time_range)) => {
+        //         !is_disjoint(filter_time_range, split_time_range)
+        //     }
+        //     _ => true, // Return `true` if `time_range` is omitted or the split has no time
+        // range. };
 
         let splits = self
             .splits
             .values()
-            .filter(|&split| split.split_state == state)
-            .filter(time_range_filter)
-            .filter(tag_filter)
+            .filter(|&split| filters.by_state(split))
+            .filter(|&split| filters.by_tags(split))
+            // .filter(time_range_filter)
             .cloned()
             .collect();
-
-        Ok(splits)
-    }
-
-    pub(crate) fn list_all_splits(&self) -> MetastoreResult<Vec<Split>> {
-        let splits = self.splits.values().cloned().collect();
         Ok(splits)
     }
 
