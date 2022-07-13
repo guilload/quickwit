@@ -85,7 +85,7 @@ impl IndexService {
 
     /// Get all indexes.
     pub async fn get_indexes(&self) -> anyhow::Result<Vec<IndexMetadata>> {
-        let indexes_metadatas = self.metastore.list_indexes_metadatas().await?;
+        let indexes_metadatas = self.metastore.list_indexes().await?;
         Ok(indexes_metadatas)
     }
 

@@ -423,7 +423,7 @@ impl Metastore for PostgresqlMetastore {
         Ok(())
     }
 
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>> {
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>> {
         run_with_tx!(self.connection_pool, tx, {
             let indexes: Vec<Index> = sqlx::query_as::<_, Index>("SELECT * FROM indexes")
                 .fetch_all(tx)

@@ -471,7 +471,7 @@ impl Metastore for FileBackedMetastore {
             .await
     }
 
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>> {
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>> {
         let per_index_metastores_rlock = self.per_index_metastores.read().await;
         try_join_all(
             per_index_metastores_rlock
@@ -606,7 +606,7 @@ mod tests {
             assert_eq!(created_index.metadata().index_uri, index_metadata.index_uri);
 
             // Check index is returned by list.
-            let indexes = metastore.list_indexes_metadatas().await.unwrap();
+            let indexes = metastore.list_indexes().await.unwrap();
             assert_eq!(indexes.len(), 1);
 
             // Open a non-existent index.
@@ -1134,7 +1134,7 @@ mod tests {
             .await?;
 
         // Fetch alive indexes metadatas.
-        let indexes_metadatas = metastore.list_indexes_metadatas().await.unwrap();
+        let indexes_metadatas = metastore.list_indexes().await.unwrap();
         assert_eq!(indexes_metadatas.len(), 1);
 
         // Fetch the index metadata not registered in indexes states json.
@@ -1142,13 +1142,13 @@ mod tests {
 
         // Now list indexes return 2 indexes metadatas as the metastore is now aware of
         // 2 alive indexes.
-        let indexes_metadatas = metastore.list_indexes_metadatas().await.unwrap();
+        let indexes_metadatas = metastore.list_indexes().await.unwrap();
         assert_eq!(indexes_metadatas.len(), 2);
 
         // Let's delete indexes.
         metastore.delete_index(index_id_alive).await.unwrap();
         metastore.delete_index(index_id_unregistered).await.unwrap();
-        let no_more_indexes = metastore.list_indexes_metadatas().await.unwrap();
+        let no_more_indexes = metastore.list_indexes().await.unwrap();
         assert!(no_more_indexes.is_empty());
 
         Ok(())

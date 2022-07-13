@@ -23,6 +23,7 @@ mod index_metadata;
 pub mod postgresql_metastore;
 #[cfg(feature = "postgres")]
 mod postgresql_model;
+mod watcher;
 
 use std::ops::Range;
 
@@ -67,12 +68,6 @@ pub trait Metastore: Send + Sync + 'static {
     /// Checks whether the metastore is available.
     async fn check_connectivity(&self) -> anyhow::Result<()>;
 
-    /// Checks whether the given index is in this metastore.
-    async fn check_index_available(&self, index_id: &str) -> anyhow::Result<()> {
-        self.index_metadata(index_id).await?;
-        Ok(())
-    }
-
     /// Creates an index.
     ///
     /// This API creates a new index in the metastore.
@@ -83,7 +78,7 @@ pub trait Metastore: Send + Sync + 'static {
     ///
     /// This API lists the indexes stored in the metastore and returns a collection of
     /// [`IndexMetadata`].
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>>;
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>>;
 
     /// Returns the [`IndexMetadata`] for a given index.
     /// TODO consider merging with list_splits to remove one round-trip
