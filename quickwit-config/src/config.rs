@@ -17,6 +17,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
 use std::env;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -32,6 +33,7 @@ use quickwit_common::uri::{Extension, Uri};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
+use crate::config_value::{ConfigValue, ConfigValueBuilder};
 use crate::templating::render_config;
 use crate::validate_identifier;
 
@@ -62,8 +64,8 @@ fn default_index_root_uri(data_dir_path: &Path) -> Uri {
         .expect("Failed to create default index_root URI. This should never happen! Please, report on https://github.com/quickwit-oss/quickwit/issues.")
 }
 
-fn default_cluster_id() -> String {
-    DEFAULT_CLUSTER_ID.to_string()
+fn default_cluster_id() -> ConfigValueBuilder<String> {
+    ConfigValueBuilder::quickwit_default(DEFAULT_CLUSTER_ID.to_string())
 }
 
 fn default_node_id() -> String {
@@ -165,12 +167,12 @@ impl Default for SearcherConfig {
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct QuickwitConfigBuilder {
-    version: usize,
+    version: ConfigValueBuilder<usize>,
     #[serde(default = "default_cluster_id")]
-    cluster_id: String,
+    cluster_id: ConfigValueBuilder<String>,
     #[serde(default = "default_node_id")]
     node_id: String,
     #[serde(default = "default_listen_address")]
@@ -346,6 +348,7 @@ impl QuickwitConfigBuilder {
     }
 
     pub async fn build(self) -> anyhow::Result<QuickwitConfig> {
+        let env_vars: HashMap<String, String> = env::vars().collect();
         let listen_host = self.listen_address.parse::<Host>()?;
 
         Ok(QuickwitConfig {
@@ -356,8 +359,8 @@ impl QuickwitConfigBuilder {
             grpc_advertise_addr: self.grpc_advertise_addr(&listen_host).await?,
             metastore_uri: self.metastore_uri()?,
             default_index_root_uri: self.default_index_root_uri()?,
-            version: self.version,
-            cluster_id: self.cluster_id,
+            version: self.version.build(&env_vars)?,
+            cluster_id: self.cluster_id.build(&env_vars)?,
             node_id: self.node_id,
             data_dir_path: self.data_dir_path,
             peer_seeds: self.peer_seeds,
@@ -385,8 +388,8 @@ fn redact_uri(
 
 #[derive(Clone, Debug, Serialize)]
 pub struct QuickwitConfig {
-    pub version: usize,
-    pub cluster_id: String,
+    pub version: ConfigValue<usize>,
+    pub cluster_id: ConfigValue<String>,
     pub node_id: String,
     pub rest_listen_addr: SocketAddr,
     pub gossip_listen_addr: SocketAddr,
@@ -500,8 +503,8 @@ impl QuickwitConfig {
         let default_index_root_uri = default_index_root_uri(&data_dir_path);
 
         Self {
-            version: 0,
-            cluster_id: default_cluster_id(),
+            version: ConfigValue::provided(0),
+            cluster_id: default_cluster_id().for_test(),
             node_id: default_node_id(),
             gossip_advertise_addr: gossip_listen_addr,
             grpc_advertise_addr: grpc_listen_addr,
@@ -528,7 +531,7 @@ mod tests {
     impl Default for QuickwitConfigBuilder {
         fn default() -> Self {
             Self {
-                version: 0,
+                version: ConfigValueBuilder::quickwit_default(0),
                 cluster_id: default_cluster_id(),
                 node_id: default_node_id(),
                 listen_address: Host::default().to_string(),
