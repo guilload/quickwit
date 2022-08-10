@@ -3034,6 +3034,7 @@ dependencies = [
  "new_string_template",
  "once_cell",
  "quickwit-common",
+ "quickwit-config-macros",
  "quickwit-doc-mapper",
  "regex",
  "serde",
@@ -3042,6 +3043,16 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "quickwit-config-macros"
+version = "0.3.1"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

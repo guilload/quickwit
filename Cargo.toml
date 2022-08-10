@@ -7,6 +7,7 @@ members = [
   "quickwit-cluster",
   "quickwit-common",
   "quickwit-config",
+  "quickwit-config-macros",
   "quickwit-core",
   "quickwit-directories",
   "quickwit-doc-mapper",
