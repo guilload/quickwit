@@ -33,7 +33,7 @@ use quickwit_common::uri::{Extension, Uri};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
-use crate::config_value::{ConfigValue, ConfigValueBuilder};
+use crate::config_value::{ConfigValue, ConfigValueBuilder, NoQwEnvVarKey};
 use crate::templating::render_config;
 use crate::validate_identifier;
 
@@ -64,7 +64,7 @@ fn default_index_root_uri(data_dir_path: &Path) -> Uri {
         .expect("Failed to create default index_root URI. This should never happen! Please, report on https://github.com/quickwit-oss/quickwit/issues.")
 }
 
-fn default_cluster_id() -> ConfigValueBuilder<String> {
+fn default_cluster_id() -> ConfigValueBuilder<String, NoQwEnvVarKey> {
     ConfigValueBuilder::quickwit_default(DEFAULT_CLUSTER_ID.to_string())
 }
 
@@ -170,9 +170,9 @@ impl Default for SearcherConfig {
 #[derive(Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct QuickwitConfigBuilder {
-    version: ConfigValueBuilder<usize>,
+    version: ConfigValueBuilder<usize, NoQwEnvVarKey>,
     #[serde(default = "default_cluster_id")]
-    cluster_id: ConfigValueBuilder<String>,
+    cluster_id: ConfigValueBuilder<String, NoQwEnvVarKey>,
     #[serde(default = "default_node_id")]
     node_id: String,
     #[serde(default = "default_listen_address")]
