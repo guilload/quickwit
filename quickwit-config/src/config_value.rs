@@ -131,6 +131,10 @@ pub(crate) struct ConfigValueBuilder<T, Q> {
     pub defaultify: bool,
 }
 
+```yaml
+node_id: "my-node-id"
+```
+
 impl<T, Q> ConfigValueBuilder<T, Q> {
     pub fn provided(value: T) -> ConfigValueBuilder<T, Q> {
         ConfigValueBuilder {
@@ -302,6 +306,27 @@ pub mod macros {
 
     // pub(crate) use {cv_provided, cvb_provided};
 }
+
+use quickwit_config_macros::ConfigBuilder;
+
+struct Foo;
+
+impl QwEnvVar for Foo {
+    fn env_var_key() -> Option<&'static str> {
+        Some("QW_REST_PORT")
+    }
+}
+
+// #[ConfigBuilder]
+struct MyConfigBuilder {
+    // #[qw_env_var]
+    rest_port: ConfigValueBuilder<u16, Foo>,
+
+    // #[qw_env_var]
+    // #[optional]
+    // grpc_port: Option<u16>,
+}
+
 
 #[cfg(test)]
 mod tests {

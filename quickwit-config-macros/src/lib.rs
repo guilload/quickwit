@@ -19,11 +19,10 @@
 
 extern crate proc_macro;
 
-use std::num;
-use std::slice::SliceIndex;
+use std::collections::HashMap;
 
 use heck::{ToShoutySnakeCase, ToUpperCamelCase};
-use proc_macro::TokenStream;
+use proc_macro::{TokenStream};
 use quote::{format_ident, quote};
 
 #[proc_macro_attribute]
@@ -131,6 +130,7 @@ pub fn Config(_attrs: TokenStream, input: TokenStream) -> TokenStream {
 ///     #[qw_env_var]
 ///     node_id: String,
 ///     rest_port: u16,
+///     #[optional]
 ///     grpc_port: Option<u16>,
 ///     #[ignore]
 ///     indexer: IndexerConfig,
@@ -153,7 +153,7 @@ pub fn ConfigBuilder(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let struct_attrs: Vec<syn::Attribute> = item_struct.attrs;
     let struct_vis = item_struct.vis;
     let struct_ident = item_struct.ident;
-    let qw_env_var_markers = item_struct
+    let qw_env_vars: HashMap<syn::Ident, (String, String)> = item_struct
         .fields
         .iter()
         .filter(|field| {
@@ -163,14 +163,19 @@ pub fn ConfigBuilder(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 .any(|attr| attr.path.is_ident("qw_env_var"))
         })
         .map(|field| {
-            let field_name = field
-                .ident
-                .as_ref()
-                .map(|ident| ident.to_string())
-                .expect("This macro should not be used for a tuple struct.");
-            let struct_ident = format_ident!("Qw{}EnvVar", field_name.to_upper_camel_case());
+            let field_ident = field.ident.clone().expect("");
+            let field_name = field_ident.to_string();
+            let marker_name = format!("Qw{}", field_name.to_upper_camel_case());
             let env_var_key = format!("QW_{}", field_name.to_uppercase());
+            (field_ident, (marker_name, env_var_key))
+        })
+        .collect();
+    let qw_env_var_markers = qw_env_vars
+        .values()
+        .map(|(marker_name, env_var_key)| {
+            let struct_ident = format_ident!("{}", marker_name);
             quote!(
+                #[derive(Debug, Eq, PartialEq)]
                 struct #struct_ident;
 
                 impl crate::config_value::QwEnvVar for #struct_ident {
@@ -187,19 +192,32 @@ pub fn ConfigBuilder(_attrs: TokenStream, input: TokenStream) -> TokenStream {
                 #field
             )
         } else {
-            let field_attrs = field.attrs;
+            let mut field_attrs = field.attrs;
             let field_vis = field.vis;
-            let field_ident = field.ident;
-            let field_ty = field.ty;
-            let env_var_ty = quote!(crate::config_value::NoQwEnvVar);
-            // let env_var_ty = if field.attrs.iter().any(|attr| attr.path.is_ident("qw_env_var")) {
-            //     ""
-            // } else {
-
-            // };
+            let field_ident = field.ident.expect("");
+            let env_var_ty = if let Some((marker_name, _)) = qw_env_vars.get(&field_ident) {
+                quote!(#marker_name)
+            } else {
+                quote!(crate::config_value::NoQwEnvVar)
+            };
+            let field_ty = if field_attrs
+                .iter()
+                .any(|attr| attr.path.is_ident("optional"))
+            {
+                let inner_ty = extract_inner_type(&field.ty);
+                quote!(
+                    Option<crate::config_value::ConfigValueBuilder<#inner_ty, #env_var_ty>>
+                )
+            } else {
+                let field_ty = field.ty;
+                quote!(
+                    crate::config_value::ConfigValueBuilder<#field_ty, #env_var_ty>
+                )
+            };
+            field_attrs.retain(|attr| !attr.path.is_ident("qw_env_var") && !attr.path.is_ident("optional"));
             quote!(
-                // #(#field_attrs)*
-                #field_vis #field_ident: crate::config_value::ConfigValueBuilder<#field_ty, #env_var_ty>
+                #(#field_attrs)*
+                #field_vis #field_ident: #field_ty
             )
         }
     });
@@ -214,11 +232,14 @@ pub fn ConfigBuilder(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     output.into()
 }
 
-fn is_option(ty: &syn::Type) -> bool {
+fn extract_inner_type(ty: &syn::Type) -> syn::Type {
     if let syn::Type::Path(type_path) = ty {
-        panic!("Segments: {:?}", type_path.path.segments);
-        false
-    } else {
-        false
+        let segment = &type_path.path.segments.last().unwrap().arguments;
+        if let syn::PathArguments::AngleBracketed(path_args) = segment {
+            if let syn::GenericArgument::Type(inner_ty) = path_args.args.last().unwrap() {
+                return inner_ty.clone();
+            }
+        }
     }
+    panic!("Failed to extract inner type.")
 }
