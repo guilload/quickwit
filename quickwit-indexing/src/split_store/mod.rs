@@ -21,7 +21,7 @@ mod indexing_split_store;
 mod local_split_store;
 
 pub use indexing_split_store::{IndexingSplitStore, IndexingSplitStoreParams};
-use local_split_store::LocalSplitStore;
+use local_split_store::OnDiskSplitStore;
 pub use local_split_store::{get_tantivy_directory_from_split_bundle, SplitFolder};
 
 /// An intermediate folder created at `<cache dir>/SPLIT_CACHE_DIR_NAME`

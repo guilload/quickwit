@@ -32,26 +32,28 @@ use tracing::{error, warn};
 use super::IndexingSplitStoreParams;
 
 pub fn get_tantivy_directory_from_split_bundle(
-    split_file: &Path,
+    split_file_path: &Path,
 ) -> StorageResult<Box<dyn Directory>> {
-    let mmap_directory = MmapDirectory::open(split_file.parent().ok_or_else(|| {
+    let mmap_directory = MmapDirectory::open(split_file_path.parent().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            format!("Couldn't find parent for {:?}", &split_file),
+            format!("Couldn't find parent for {:?}", &split_file_path),
         )
     })?)?;
-    let split_fileslice = mmap_directory.open_read(Path::new(&split_file))?;
-    Ok(Box::new(BundleDirectory::open_split(split_fileslice)?))
+    let split_file_slice = mmap_directory.open_read(Path::new(&split_file_path))?;
+    Ok(Box::new(BundleDirectory::open_split(split_file_slice)?))
 }
 
 #[derive(Clone, Debug)]
 pub struct SplitFolder {
     path: PathBuf,
 }
+
 impl SplitFolder {
     pub fn new(path: PathBuf) -> Self {
         SplitFolder { path }
     }
+
     fn path(&self) -> &Path {
         &self.path
     }
@@ -97,35 +99,46 @@ fn split_id_from_split_folder(dir_entry: &DirEntry) -> Option<String> {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct SizeInCache {
+struct StoreFootprint {
+    pub num_bytes: usize,
     pub num_splits: usize,
-    pub size_in_bytes: usize,
 }
 
-pub struct LocalSplitStore {
+pub struct OnDiskSplitStore {
     /// The parameters of the cache.
     params: IndexingSplitStoreParams,
     /// Splits owned by the local split store, which reside in the split_store_folder.
-    /// SplitId -> (Split Num Bytes, BundledSplitFile)
-    split_files: HashMap<String, (usize, SplitFolder)>,
+    /// (IndexId, SplitId) -> (Split Num Bytes, BundledSplitFile)
+    split_folders: HashMap<(String, String), (usize, SplitFolder)>,
     /// The root folder where all data is moved into.
-    split_store_folder: PathBuf,
+    split_store_root: PathBuf,
 }
 
-impl LocalSplitStore {
+impl OnDiskSplitStore {
     /// Try to open an existing local split directory.
     ///
     /// All files finishing by .split will be considered to be part of the directory.
     pub fn open(
-        local_storage_root: PathBuf,
+        split_store_root: PathBuf,
         params: IndexingSplitStoreParams,
-    ) -> StorageResult<LocalSplitStore> {
-        let mut split_files: HashMap<String, (usize, SplitFolder)> = HashMap::new();
-        let mut total_size_in_bytes: usize = 0;
-        for dir_entry_result in fs::read_dir(&local_storage_root)? {
-            let dir_entry = dir_entry_result?;
-            if let Some(split_id) = split_id_from_split_folder(&dir_entry) {
+    ) -> StorageResult<OnDiskSplitStore> {
+        let mut split_folders: HashMap<(String, String), (usize, SplitFolder)> = HashMap::new();
+        let mut total_num_bytes: usize = 0;
+        for dir_entry_res in fs::read_dir(&split_store_root)? {
+            let dir_path = dir_entry_res?.path();
+            if dir_path.is_file() {
+                continue;
+            }
+            let dir_name: String = ;
+            for entry_res in fs::read_dir(&dir_path)? {
+            let entry_path = entry_res?.path();
+            if  entry_path.is_dir() {
+                continue;
+            }
+            if let Some(split_id) = entry_path.file_name().filter(|entry| entry.ends_with(".split")) {
                 let split_file = SplitFolder::new(dir_entry.path());
+            }
+            if let Some(split_id) = split_id_from_split_folder(&dir_entry) {
                 let paths: Vec<_> = fs::read_dir(dir_entry.path())?
                     .map(|el| el.map(|el| el.path()))
                     .collect::<Result<_, _>>()?;
@@ -133,27 +146,26 @@ impl LocalSplitStore {
                 let split_streamer = SplitPayloadBuilder::get_split_payload(&paths, &[])?;
 
                 let split_num_bytes = split_streamer.len() as usize;
-                total_size_in_bytes += split_num_bytes;
-                split_files.insert(split_id, (split_num_bytes, split_file));
+                total_num_bytes += split_num_bytes;
+                split_folders.insert((index_id, split_id, (split_num_bytes, split_file));
             }
         }
 
-        if split_files.len() > params.max_num_splits {
+        if total_num_splits.len() > params.max_num_splits {
             return Err(StorageErrorKind::InternalError.with_error(anyhow::anyhow!(
                 "Initial number of files exceeds the maximum number of files allowed.",
             )));
         }
-
-        if total_size_in_bytes > params.max_num_bytes {
+        if total_num_bytes > params.max_num_bytes {
             return Err(StorageErrorKind::InternalError.with_error(anyhow::anyhow!(
                 "Initial cache size exceeds the maximum size in bytes allowed.",
             )));
         }
 
-        Ok(LocalSplitStore {
-            split_store_folder: local_storage_root,
+        Ok(OnDiskSplitStore {
+            split_store_root,
             params,
-            split_files,
+            split_folders: split_files,
         })
     }
 
@@ -161,7 +173,7 @@ impl LocalSplitStore {
     /// By only keeping the splits specified and removing other
     /// existing splits in this store.
     pub async fn retain_only(&mut self, split_ids: &[&str]) -> StorageResult<()> {
-        let stored_ids_set: HashSet<String> = self.split_files.keys().cloned().collect();
+        let stored_ids_set: HashSet<String> = self.split_folders.keys().cloned().collect();
         let to_retain_ids_set: HashSet<String> = split_ids
             .iter()
             .map(|split_id| split_id.to_string())
@@ -176,17 +188,17 @@ impl LocalSplitStore {
 
     #[cfg(test)]
     pub fn inspect(&self) -> HashMap<String, usize> {
-        self.split_files
+        self.split_folders
             .iter()
             .map(|(k, v)| (k.to_string(), v.0))
             .collect()
     }
 
     pub async fn remove_split(&mut self, split_id: &str) -> StorageResult<()> {
-        if !self.split_files.contains_key(split_id) {
+        if !self.split_folders.contains_key(split_id) {
             return Ok(());
         }
-        if let Some((_, split_file)) = self.split_files.remove(split_id) {
+        if let Some((_, split_file)) = self.split_folders.remove(split_id) {
             split_file.delete().await?;
         }
         Ok(())
@@ -210,7 +222,7 @@ impl LocalSplitStore {
         to_folder: &Path,
     ) -> StorageResult<SplitFolder> {
         let mut split_file = self
-            .split_files
+            .split_folders
             .remove(split_id)
             .ok_or_else(|| {
                 StorageErrorKind::DoesNotExist
@@ -227,34 +239,34 @@ impl LocalSplitStore {
         split_id: &str,
         output_dir_path: &Path,
     ) -> StorageResult<Option<SplitFolder>> {
-        if !self.split_files.contains_key(split_id) {
+        if !self.split_folders.contains_key(split_id) {
             return Ok(None);
         }
         let split_file_res = self.move_out(split_id, output_dir_path).await;
         match split_file_res {
             Ok(split_file) => {
-                self.split_files.remove(split_id);
+                self.split_folders.remove(split_id);
                 Ok(Some(split_file))
             }
             Err(storage_err) if storage_err.kind() == StorageErrorKind::DoesNotExist => {
                 error!(split_id = split_id, error = ?storage_err, "Cached split file/folder is missing.");
-                self.split_files.remove(split_id);
+                self.split_folders.remove(split_id);
                 Ok(None)
             }
             Err(storage_err) => Err(storage_err),
         }
     }
 
-    fn size_in_store(&self) -> SizeInCache {
+    fn size_in_store(&self) -> StoreFootprint {
         let size_in_bytes = self
-            .split_files
+            .split_folders
             .values()
             .map(|(size, _)| size)
             .cloned()
             .sum::<usize>();
-        SizeInCache {
-            num_splits: self.split_files.len(),
-            size_in_bytes,
+        StoreFootprint {
+            num_splits: self.split_folders.len(),
+            num_bytes: size_in_bytes,
         }
     }
 
@@ -282,15 +294,15 @@ impl LocalSplitStore {
         }
 
         // Ignore storing a file that cannot fit in remaining space in the cache.
-        if split_num_bytes + size_in_cache.size_in_bytes > self.params.max_num_bytes {
+        if split_num_bytes + size_in_cache.num_bytes > self.params.max_num_bytes {
             warn!("Failed to cache file: maximum size in bytes of cache exceeded.");
             return Ok(false);
         }
 
-        self.move_into(&mut split_folder, &self.split_store_folder, split_id)
+        self.move_into(&mut split_folder, &self.split_store_root, split_id)
             .await?;
 
-        self.split_files
+        self.split_folders
             .insert(split_id.to_string(), (split_num_bytes, split_folder));
         Ok(true)
     }
@@ -319,16 +331,16 @@ mod tests {
         tokio::fs::create_dir(&temp_dir.path().join("split1.split")).await?;
         tokio::fs::create_dir(&temp_dir.path().join("split2.split")).await?;
         let params = IndexingSplitStoreParams::default();
-        let split_store = LocalSplitStore::open(temp_dir.path().to_path_buf(), params)?;
+        let split_store = OnDiskSplitStore::open(temp_dir.path().to_path_buf(), params)?;
         let cache_content = split_store.inspect();
         assert_eq!(cache_content.len(), 2);
         assert_eq!(cache_content.get("split1").cloned(), Some(28));
         assert_eq!(cache_content.get("split2").cloned(), Some(28));
         assert_eq!(
             split_store.size_in_store(),
-            SizeInCache {
+            StoreFootprint {
                 num_splits: 2,
-                size_in_bytes: 28 * 2
+                num_bytes: 28 * 2
             }
         );
         Ok(())

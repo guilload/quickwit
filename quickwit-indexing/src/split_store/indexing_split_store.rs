@@ -31,7 +31,7 @@ use tantivy::Directory;
 use tokio::sync::Mutex;
 use tracing::info;
 
-use super::LocalSplitStore;
+use super::OnDiskSplitStore;
 use crate::split_store::SPLIT_CACHE_DIR_NAME;
 use crate::{
     get_tantivy_directory_from_split_bundle, MergePolicy, SplitFolder,
@@ -80,7 +80,7 @@ pub struct IndexingSplitStore {
     /// Remote storage associated with each index.
     remote_storages: Arc<Mutex<HashMap<String, Arc<dyn Storage>>>>,
 
-    local_split_store: Option<Arc<Mutex<LocalSplitStore>>>,
+    local_split_store: Option<Arc<Mutex<OnDiskSplitStore>>>,
 
     /// The merge policy is useful to identify whether a split
     /// should be stored in the local storage or not.
@@ -99,7 +99,7 @@ impl IndexingSplitStore {
     ) -> StorageResult<Self> {
         let local_storage_root = cache_directory.join(SPLIT_CACHE_DIR_NAME);
         std::fs::create_dir_all(&local_storage_root)?;
-        let local_split_store = LocalSplitStore::open(local_storage_root, cache_params)?;
+        let local_split_store = OnDiskSplitStore::open(local_storage_root, cache_params)?;
         Ok(Self {
             remote_storages: Default::default(),
             local_split_store: Some(Arc::new(Mutex::new(local_split_store))),
