@@ -26,7 +26,7 @@ enum ScratchDirectoryType {
     TempDir(tempfile::TempDir),
 }
 
-/// Helps creating a hierarchy of temp directory.
+/// Helps creating a hierarchy of temp directories.
 ///
 /// Upon drop the directory get automatically deleted.
 /// The root of the tree may or may not be a directory that we do not delete,

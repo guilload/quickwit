@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 
 use anyhow::Context;
@@ -42,9 +43,9 @@ use crate::{
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct IndexingSplitStoreParams {
     /// Maximum number of files allowed in the cache.
-    pub max_num_splits: usize,
+    pub max_num_splits: AtomicUsize,
     /// Maximum size in bytes allowed in the cache.
-    pub max_num_bytes: usize,
+    pub max_num_bytes: AtomicUsize,
 }
 
 impl Default for IndexingSplitStoreParams {
