@@ -18,5 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 mod janitor_service;
+mod retention_executor;
 
 pub use janitor_service::JanitorService;

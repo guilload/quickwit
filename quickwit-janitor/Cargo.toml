@@ -13,9 +13,7 @@ documentation = "https://quickwit.io/docs/"
 anyhow = "1"
 async-trait = "0.1"
 quickwit-actors = { version = "0.3.1", path = "../quickwit-actors" }
-quickwit-config = { version = "0.3.1", path = "../quickwit-config", features = [
-  "testsuite"
-] }
+quickwit-config = { version = "0.3.1", path = "../quickwit-config" }
 quickwit-metastore = { version = "0.3.1", path = "../quickwit-metastore" }
 quickwit-storage = { version = "0.3.1", path = "../quickwit-storage" }
 serde = "1"

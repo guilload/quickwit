@@ -64,6 +64,7 @@ pub struct IndexMetadata {
 impl IndexMetadata {
     /// Returns an [`IndexMetadata`] object with multiple hard coded values for tests.
     #[doc(hidden)]
+    #[cfg(any(test, feature = "testsuite"))]
     pub fn for_test(index_id: &str, index_uri: &str) -> Self {
         let index_uri = Uri::new(index_uri.to_string());
         let doc_mapping_json = r#"{

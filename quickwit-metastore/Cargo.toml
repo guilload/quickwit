@@ -47,7 +47,9 @@ quickwit-config = { version = "0.3.1", path = "../quickwit-config", features = [
 quickwit-doc-mapper = { version = "0.3.1", path = "../quickwit-doc-mapper", features = [
   "testsuite"
 ] }
-quickwit-storage = { version = "0.3.1", path = "../quickwit-storage", features = ["testsuite"]}
+quickwit-storage = { version = "0.3.1", path = "../quickwit-storage", features = [
+  "testsuite"
+] }
 rand = "0.8"
 tracing-subscriber = "0.3"
 
