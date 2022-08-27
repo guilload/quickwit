@@ -228,6 +228,33 @@ pub struct SearchSettings {
     pub default_search_fields: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum RetentionCutoffTimestamp {
+    PublishTimestamp,
+    SplitTimestamp,
+}
+
+#[derive(Clone, Debug, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RetentionPolicy {
+    pub period: Duration,
+    pub cutoff_timestamp: String,
+    #[serde(default = "RetentionPolicy::default_schedule")]
+    pub schedule: String, // TODO: Use CRON schedule
+}
+
+impl RetentionPolicy {
+    fn default_schedule() -> String {
+        "hourly".to_string()
+    }
+
+    fn fingerprint(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IndexConfig {
@@ -243,6 +270,8 @@ pub struct IndexConfig {
     pub search_settings: SearchSettings,
     #[serde(default)]
     pub sources: Vec<SourceConfig>,
+    #[serde(rename = "retention")]
+    pub retention_policy: Option<RetentionPolicy>,
 }
 
 impl IndexConfig {

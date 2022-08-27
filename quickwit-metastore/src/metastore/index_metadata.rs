@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use quickwit_common::uri::Uri;
 use quickwit_config::{
-    DocMapping, IndexingResources, IndexingSettings, SearchSettings, SourceConfig,
+    DocMapping, IndexingResources, IndexingSettings, RetentionPolicy, SearchSettings, SourceConfig,
 };
 use quickwit_doc_mapper::SortOrder;
 use serde::{Deserialize, Serialize};
@@ -53,6 +53,8 @@ pub struct IndexMetadata {
     pub search_settings: SearchSettings,
     /// Data sources keyed by their `source_id`.
     pub sources: HashMap<String, SourceConfig>,
+    /// An optional retention policy which will be applied to the splits of the index.
+    pub retention_policy: Option<RetentionPolicy>,
     /// Time at which the index was created.
     pub create_timestamp: i64,
     /// Time at which the index was last updated.
@@ -146,9 +148,15 @@ impl IndexMetadata {
             indexing_settings,
             search_settings,
             sources: Default::default(),
+            retention_policy: None, // TODO
             create_timestamp: now_timestamp,
             update_timestamp: now_timestamp,
         }
+    }
+
+    /// Returns whether the index has a timestamp field.
+    pub fn is_timeseries(&self) -> bool {
+        self.indexing_settings.timestamp_field.is_some()
     }
 
     pub(crate) fn add_source(&mut self, source: SourceConfig) -> MetastoreResult<()> {
@@ -251,6 +259,7 @@ impl From<IndexMetadataV1> for IndexMetadata {
             indexing_settings: v1.indexing_settings,
             search_settings: v1.search_settings,
             sources,
+            retention_policy: None,
             create_timestamp: v1.create_timestamp,
             update_timestamp: v1.update_timestamp,
         }
