@@ -686,14 +686,14 @@ async fn test_cmd_garbage_collect_spares_files_within_grace_period() -> Result<(
     ));
 
     let index_path = test_env.indexes_dir_path.join(&test_env.index_id);
-    let split_filename = quickwit_common::split_file(splits[0].split_metadata.split_id.as_str());
+    let split_filename = quickwit_common::split_file(splits[0].metadata.split_id.as_str());
     let split_path = index_path.join(&split_filename);
     assert_eq!(split_path.exists(), true);
 
     // The following steps help turn an existing published split into a staged one
     // without deleting the files.
     let split = splits[0].clone();
-    let split_ids = [split.split_metadata.split_id.as_str()];
+    let split_ids = [split.metadata.split_id.as_str()];
     metastore
         .mark_splits_for_deletion(&test_env.index_id, &split_ids)
         .await?;
@@ -701,7 +701,7 @@ async fn test_cmd_garbage_collect_spares_files_within_grace_period() -> Result<(
         .delete_splits(&test_env.index_id, &split_ids)
         .await?;
     metastore
-        .stage_split(&test_env.index_id, split.split_metadata)
+        .stage_split(&test_env.index_id, split.metadata)
         .await?;
     assert_eq!(split_path.exists(), true);
 

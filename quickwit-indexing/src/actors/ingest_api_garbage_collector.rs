@@ -111,7 +111,7 @@ impl IngestApiGarbageCollector {
 
         let index_ids: HashSet<String> = self
             .metastore
-            .list_indexes_metadatas()
+            .list_indexes()
             .await
             .context("Failed to list queues")?
             .into_iter()

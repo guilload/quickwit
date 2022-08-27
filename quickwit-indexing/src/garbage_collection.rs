@@ -92,8 +92,8 @@ pub async fn run_garbage_collect(
         .await?
         .into_iter()
         // TODO: Update metastore API and push this filter down.
-        .filter(|meta| meta.update_timestamp < grace_period_timestamp)
-        .map(|meta| meta.split_metadata)
+        .filter(|split| split.update_timestamp < grace_period_timestamp)
+        .map(|split| split.metadata)
         .collect();
     if let Some(ctx) = ctx_opt {
         ctx.record_progress();
@@ -104,7 +104,7 @@ pub async fn run_garbage_collect(
             .list_splits(index_id, SplitState::MarkedForDeletion, None, None)
             .await?
             .into_iter()
-            .map(|meta| meta.split_metadata)
+            .map(|split| split.metadata)
             .collect::<Vec<_>>();
         splits_marked_for_deletion.extend(deletable_staged_splits);
 
@@ -133,7 +133,7 @@ pub async fn run_garbage_collect(
         .into_iter()
         // TODO: Update metastore API and push this filter down.
         .filter(|meta| meta.update_timestamp <= grace_period_deletion)
-        .map(|meta| meta.split_metadata)
+        .map(|meta| meta.metadata)
         .collect();
 
     let deleted_files = delete_splits_with_files(

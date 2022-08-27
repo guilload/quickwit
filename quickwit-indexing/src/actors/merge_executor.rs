@@ -901,7 +901,7 @@ mod tests {
             .list_all_splits(&pipeline_id.index_id)
             .await?
             .into_iter()
-            .map(|split| split.split_metadata)
+            .map(|split| split.metadata)
             .collect();
         assert_eq!(split_metas.len(), 4);
         let merge_scratch_directory = ScratchDirectory::for_test()?;
@@ -956,6 +956,7 @@ mod tests {
         Ok(())
     }
 
+<<<<<<< HEAD
     #[test]
     fn test_combine_partition_ids_singleton_unchanged() {
         assert_eq!(combine_partition_ids_aux([17].into_iter()), 17);
@@ -966,6 +967,181 @@ mod tests {
         assert_ne!(
             combine_partition_ids_aux([12u64, 0u64].into_iter()),
             combine_partition_ids_aux([12u64].into_iter())
+||||||| parent of fd165612 (WIP)
+    #[tokio::test]
+    async fn test_demux_execution() -> anyhow::Result<()> {
+        quickwit_common::setup_logging_for_tests();
+        let index_id = "test-index-demux";
+        let doc_mapping_yaml = r#"
+            field_mappings:
+              - name: body
+                type: text
+              - name: ts
+                type: i64
+                fast: true
+              - name: tenant_id
+                type: u64
+                fast: true
+            tag_fields: [tenant_id]
+        "#;
+        let indexing_settings_yaml = r#"
+            demux_field: tenant_id
+            timestamp_field: ts
+        "#;
+        let test_sandbox = TestSandbox::create(
+            index_id,
+            doc_mapping_yaml,
+            indexing_settings_yaml,
+            &["body"],
+        )
+        .await?;
+        let mut last_tenant_min_timestamp = 0i64;
+        let mut last_tenant_max_timestamp = 0i64;
+        for split_id in 0..4 {
+            let last_tenant_timestamp: i64 = 1631072713 + (1 + split_id) * 20;
+            let docs = vec![
+                serde_json::json!({"body ": format!("split{}", split_id), "ts": 1631072713i64 + split_id, "tenant_id": 10u64 }),
+                serde_json::json!({"body ": format!("split{}", split_id), "ts": 1631072713i64 + (1 + split_id) * 10, "tenant_id": 11u64 }),
+                serde_json::json!({"body ": format!("split{}", split_id), "ts": last_tenant_timestamp, "tenant_id": 12u64 }),
+            ];
+            if split_id == 0 {
+                last_tenant_min_timestamp = last_tenant_timestamp;
+            }
+            if split_id == 3 {
+                last_tenant_max_timestamp = last_tenant_timestamp;
+            }
+            test_sandbox.add_documents(docs).await?;
+        }
+        let metastore = test_sandbox.metastore();
+        let split_metas: Vec<SplitMetadata> = metastore
+            .list_all_splits(index_id)
+            .await?
+            .into_iter()
+            .map(|split| split.split_metadata)
+            .collect();
+        let demux_split_ids = (0..split_metas.len() - 1)
+            .map(|_| new_split_id())
+            .collect_vec();
+        let total_num_bytes_docs = split_metas
+            .iter()
+            .map(|meta| meta.uncompressed_docs_size_in_bytes)
+            .sum::<u64>();
+        let merge_scratch_directory = ScratchDirectory::for_test()?;
+        let downloaded_splits_directory =
+            merge_scratch_directory.named_temp_child("downloaded-splits")?;
+        for split_meta in &split_metas {
+            let split_filename = split_file(split_meta.split_id());
+            let dest_filepath = downloaded_splits_directory.path().join(&split_filename);
+            test_sandbox
+                .storage()
+                .copy_to_file(Path::new(&split_filename), &dest_filepath)
+                .await?;
+        }
+        let merge_scratch = MergeScratch {
+            merge_operation: MergeOperation::Demux {
+                splits: split_metas,
+                demux_split_ids,
+            },
+            merge_scratch_directory,
+            downloaded_splits_directory,
+            tantivy_dirs: Default::default(),
+        };
+        let (merge_packager_mailbox, merge_packager_inbox) = create_test_mailbox();
+        let merge_executor = MergeExecutor::new(
+            index_id.to_string(),
+            merge_packager_mailbox,
+            Some("ts".to_string()),
+            Some("tenant_id".to_string()),
+            2,
+            5,
+=======
+    #[tokio::test]
+    async fn test_demux_execution() -> anyhow::Result<()> {
+        quickwit_common::setup_logging_for_tests();
+        let index_id = "test-index-demux";
+        let doc_mapping_yaml = r#"
+            field_mappings:
+              - name: body
+                type: text
+              - name: ts
+                type: i64
+                fast: true
+              - name: tenant_id
+                type: u64
+                fast: true
+            tag_fields: [tenant_id]
+        "#;
+        let indexing_settings_yaml = r#"
+            demux_field: tenant_id
+            timestamp_field: ts
+        "#;
+        let test_sandbox = TestSandbox::create(
+            index_id,
+            doc_mapping_yaml,
+            indexing_settings_yaml,
+            &["body"],
+        )
+        .await?;
+        let mut last_tenant_min_timestamp = 0i64;
+        let mut last_tenant_max_timestamp = 0i64;
+        for split_id in 0..4 {
+            let last_tenant_timestamp: i64 = 1631072713 + (1 + split_id) * 20;
+            let docs = vec![
+                serde_json::json!({"body ": format!("split{}", split_id), "ts": 1631072713i64 + split_id, "tenant_id": 10u64 }),
+                serde_json::json!({"body ": format!("split{}", split_id), "ts": 1631072713i64 + (1 + split_id) * 10, "tenant_id": 11u64 }),
+                serde_json::json!({"body ": format!("split{}", split_id), "ts": last_tenant_timestamp, "tenant_id": 12u64 }),
+            ];
+            if split_id == 0 {
+                last_tenant_min_timestamp = last_tenant_timestamp;
+            }
+            if split_id == 3 {
+                last_tenant_max_timestamp = last_tenant_timestamp;
+            }
+            test_sandbox.add_documents(docs).await?;
+        }
+        let metastore = test_sandbox.metastore();
+        let split_metas: Vec<SplitMetadata> = metastore
+            .list_all_splits(index_id)
+            .await?
+            .into_iter()
+            .map(|split| split.metadata)
+            .collect();
+        let demux_split_ids = (0..split_metas.len() - 1)
+            .map(|_| new_split_id())
+            .collect_vec();
+        let total_num_bytes_docs = split_metas
+            .iter()
+            .map(|meta| meta.uncompressed_docs_size_in_bytes)
+            .sum::<u64>();
+        let merge_scratch_directory = ScratchDirectory::for_test()?;
+        let downloaded_splits_directory =
+            merge_scratch_directory.named_temp_child("downloaded-splits")?;
+        for split_meta in &split_metas {
+            let split_filename = split_file(split_meta.split_id());
+            let dest_filepath = downloaded_splits_directory.path().join(&split_filename);
+            test_sandbox
+                .storage()
+                .copy_to_file(Path::new(&split_filename), &dest_filepath)
+                .await?;
+        }
+        let merge_scratch = MergeScratch {
+            merge_operation: MergeOperation::Demux {
+                splits: split_metas,
+                demux_split_ids,
+            },
+            merge_scratch_directory,
+            downloaded_splits_directory,
+            tantivy_dirs: Default::default(),
+        };
+        let (merge_packager_mailbox, merge_packager_inbox) = create_test_mailbox();
+        let merge_executor = MergeExecutor::new(
+            index_id.to_string(),
+            merge_packager_mailbox,
+            Some("ts".to_string()),
+            Some("tenant_id".to_string()),
+            2,
+            5,
+>>>>>>> fd165612 (WIP)
         );
     }
 

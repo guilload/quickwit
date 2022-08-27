@@ -163,9 +163,9 @@ impl FileBackedIndex {
 
         let now_timestamp = OffsetDateTime::now_utc().unix_timestamp();
         let metadata = Split {
-            split_state: SplitState::Staged,
+            state: SplitState::Staged,
             update_timestamp: now_timestamp,
-            split_metadata,
+            metadata: split_metadata,
         };
 
         self.splits
@@ -195,16 +195,24 @@ impl FileBackedIndex {
                     continue;
                 }
             };
+<<<<<<< HEAD
             if !deletable_states.contains(&metadata.split_state) {
                 non_deletable_split_ids.push(split_id.to_string());
                 continue;
             };
             if metadata.split_state == SplitState::MarkedForDeletion {
+||||||| parent of fd165612 (WIP)
+
+            if metadata.split_state == SplitState::MarkedForDeletion {
+=======
+
+            if metadata.state == SplitState::MarkedForDeletion {
+>>>>>>> fd165612 (WIP)
                 // If the split is already marked for deletion, This is fine, we just skip it.
                 continue;
             }
 
-            metadata.split_state = SplitState::MarkedForDeletion;
+            metadata.state = SplitState::MarkedForDeletion;
             metadata.update_timestamp = now_timestamp;
             is_modified = true;
         }
@@ -243,14 +251,14 @@ impl FileBackedIndex {
                 }
             };
 
-            match metadata.split_state {
+            match metadata.state {
                 SplitState::Published => {
                     // Split is already published. This is fine, we just skip it.
                     continue;
                 }
                 SplitState::Staged => {
                     // The split state needs to be updated.
-                    metadata.split_state = SplitState::Published;
+                    metadata.state = SplitState::Published;
                     metadata.update_timestamp = now_timestamp;
                 }
                 _ => {
@@ -295,26 +303,25 @@ impl FileBackedIndex {
         time_range_opt: Option<Range<i64>>,
         tags_filter: Option<TagFilterAst>,
     ) -> MetastoreResult<Vec<Split>> {
-        let time_range_filter = |split: &&Split| match (
-            time_range_opt.as_ref(),
-            split.split_metadata.time_range.as_ref(),
-        ) {
-            (Some(filter_time_range), Some(split_time_range)) => {
-                !is_disjoint(filter_time_range, split_time_range)
-            }
-            _ => true, // Return `true` if `time_range` is omitted or the split has no time range.
-        };
+        let time_range_filter =
+            |split: &&Split| match (time_range_opt.as_ref(), split.metadata.time_range.as_ref()) {
+                (Some(filter_time_range), Some(split_time_range)) => {
+                    !is_disjoint(filter_time_range, split_time_range)
+                }
+                _ => true, /* Return `true` if `time_range` is omitted or the split has no time
+                            * range. */
+            };
 
         let tag_filter = |split: &&Split| {
             tags_filter
                 .as_ref()
-                .map(|tags_filter_ast| tags_filter_ast.evaluate(&split.split_metadata.tags))
+                .map(|tags_filter_ast| tags_filter_ast.evaluate(&split.metadata.tags))
                 .unwrap_or(true)
         };
         let splits = self
             .splits
             .values()
-            .filter(|&split| split.split_state == state)
+            .filter(|&split| split.state == state)
             .filter(time_range_filter)
             .filter(tag_filter)
             .cloned()
@@ -328,9 +335,31 @@ impl FileBackedIndex {
     }
 
     fn delete_split(&mut self, split_id: &str) -> DeleteSplitOutcome {
+<<<<<<< HEAD
         match self.splits.get(split_id).map(|split| split.split_state) {
             // Only `Staged` and `MarkedForDeletion` splits can be deleted
             Some(SplitState::Staged | SplitState::MarkedForDeletion) => {
+||||||| parent of fd165612 (WIP)
+        let metadata = match self.splits.get_mut(split_id) {
+            Some(metadata) => metadata,
+            None => {
+                return DeleteSplitOutcome::SplitNotFound;
+            }
+        };
+        match metadata.split_state {
+            SplitState::MarkedForDeletion | SplitState::Staged => {
+                // Only `ScheduledForDeletion` and `Staged` can be deleted
+=======
+        let metadata = match self.splits.get_mut(split_id) {
+            Some(metadata) => metadata,
+            None => {
+                return DeleteSplitOutcome::SplitNotFound;
+            }
+        };
+        match metadata.state {
+            SplitState::MarkedForDeletion | SplitState::Staged => {
+                // Only `ScheduledForDeletion` and `Staged` can be deleted
+>>>>>>> fd165612 (WIP)
                 self.splits.remove(split_id);
                 DeleteSplitOutcome::Success
             }

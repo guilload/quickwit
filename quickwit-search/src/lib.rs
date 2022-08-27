@@ -132,7 +132,7 @@ async fn list_relevant_splits(
         .await?;
     Ok(split_metas
         .into_iter()
-        .map(|metadata| metadata.split_metadata)
+        .map(|metadata| metadata.metadata)
         .collect::<Vec<_>>())
 }
 

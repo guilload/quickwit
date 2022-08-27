@@ -25,8 +25,10 @@ mod indexing_service;
 mod ingest_api_garbage_collector;
 mod packager;
 mod publisher;
+mod retention_executor;
 mod sequencer;
 mod uploader;
+mod metastore_watcher;
 
 pub use indexing_pipeline::{IndexingPipeline, IndexingPipelineHandle, IndexingPipelineParams};
 pub use indexing_service::{

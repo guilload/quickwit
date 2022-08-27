@@ -106,10 +106,10 @@ impl IndexService {
         Ok(splits)
     }
 
-    /// Get all indexes.
+    /// Lists all indexes.
     pub async fn list_indexes(&self) -> anyhow::Result<Vec<IndexMetadata>> {
-        let indexes_metadatas = self.metastore.list_indexes_metadatas().await?;
-        Ok(indexes_metadatas)
+        let indexes = self.metastore.list_indexes().await?;
+        Ok(indexes)
     }
 
     /// Creates an index from `IndexConfig`.
@@ -188,7 +188,7 @@ impl IndexService {
                 .list_all_splits(index_id)
                 .await?
                 .into_iter()
-                .map(|metadata| metadata.split_metadata)
+                .map(|split| split.metadata)
                 .collect::<Vec<_>>();
 
             let file_entries_to_delete: Vec<FileEntry> =
@@ -220,7 +220,7 @@ impl IndexService {
             .list_splits(index_id, SplitState::MarkedForDeletion, None, None)
             .await?
             .into_iter()
-            .map(|metadata| metadata.split_metadata)
+            .map(|split| split.metadata)
             .collect::<Vec<_>>();
 
         let split_store = IndexingSplitStore::create_with_no_local_store(storage);
@@ -284,10 +284,8 @@ impl IndexService {
         self.metastore
             .mark_splits_for_deletion(index_id, &split_ids)
             .await?;
-        let split_metas: Vec<SplitMetadata> = splits
-            .into_iter()
-            .map(|split| split.split_metadata)
-            .collect();
+        let split_metas: Vec<SplitMetadata> =
+            splits.into_iter().map(|split| split.metadata).collect();
         let split_store = IndexingSplitStore::create_with_no_local_store(storage);
         // FIXME: return an error.
         if let Err(err) = delete_splits_with_files(

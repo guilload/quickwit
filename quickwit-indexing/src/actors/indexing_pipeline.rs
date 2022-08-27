@@ -247,7 +247,7 @@ impl IndexingPipeline {
             )
             .await?
             .into_iter()
-            .map(|split| split.split_metadata)
+            .map(|split| split.metadata)
             .collect::<Vec<_>>();
         split_store
             .remove_dangling_splits(&published_splits)

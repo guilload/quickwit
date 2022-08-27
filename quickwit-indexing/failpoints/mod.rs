@@ -191,11 +191,11 @@ async fn aux_test_failpoints() -> anyhow::Result<()> {
     splits.sort_by_key(|split| *split.split_metadata.time_range.clone().unwrap().start());
     assert_eq!(splits.len(), 2);
     assert_eq!(
-        splits[0].split_metadata.time_range.clone().unwrap(),
+        splits[0].metadata.time_range.clone().unwrap(),
         1629889530..=1629889531
     );
     assert_eq!(
-        splits[1].split_metadata.time_range.clone().unwrap(),
+        splits[1].metadata.time_range.clone().unwrap(),
         1629889532..=1629889533
     );
     Ok(())
@@ -257,7 +257,7 @@ async fn test_merge_executor_controlled_directory_kill_switch() -> anyhow::Resul
     let split_infos = metastore.list_all_splits(index_id).await?;
     let splits: Vec<SplitMetadata> = split_infos
         .into_iter()
-        .map(|split| split.split_metadata)
+        .map(|split| split.metadata)
         .collect();
     let merge_scratch_directory = ScratchDirectory::for_test()?;
 

@@ -79,9 +79,17 @@ pub async fn start_indexing_service(
     );
     let (indexing_service, _) = universe.spawn_actor(indexing_service).spawn();
 
+<<<<<<< HEAD
     // List indexes and spawn indexing pipeline(s) for each of them.
     let index_metadatas = metastore.list_indexes_metadatas().await?;
     info!(index_ids=%index_metadatas.iter().map(|im| &im.index_id).join(", "), "Spawning indexing pipeline(s).");
+||||||| parent of fd165612 (WIP)
+    let index_metadatas = metastore.list_indexes_metadatas().await?;
+    info!(index_ids = %index_metadatas.iter().map(|im| &im.index_id).join(", "), "Spawning indexing pipeline(s).");
+=======
+    let index_metadatas = metastore.list_indexes().await?;
+    info!(index_ids = %index_metadatas.iter().map(|im| &im.index_id).join(", "), "Spawning indexing pipeline(s).");
+>>>>>>> fd165612 (WIP)
 
     for index_metadata in index_metadatas {
         indexing_service

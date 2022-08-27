@@ -26,8 +26,8 @@ fn sample_file_backed_index_for_regression() -> FileBackedIndex {
     let index_metadata = sample_index_metadata_for_regression();
     let split_metadata = sample_split_metadata_for_regression();
     let split = Split {
-        split_state: SplitState::Published,
-        split_metadata,
+        state: SplitState::Published,
+        metadata: split_metadata,
         update_timestamp: 1789,
     };
     let splits = vec![split];

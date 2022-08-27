@@ -477,19 +477,19 @@ fn filter_splits(
     let split_state_filter = |split: &Split| {
         split_states_opt
             .as_ref()
-            .map(|split_states| split_states.contains(&split.split_state))
+            .map(|split_states| split_states.contains(&split.state))
             .unwrap_or(true)
     };
     let create_ts_filter = |split: &Split| {
         create_ts_opt
-            .map(|create_ts| create_ts >= split.split_metadata.create_timestamp)
+            .map(|create_ts| create_ts >= split.metadata.create_timestamp)
             .unwrap_or(true)
     };
     let start_ts_filter = |split: &Split| {
         start_ts_opt
             .and_then(|start_ts| {
                 split
-                    .split_metadata
+                    .metadata
                     .time_range
                     .as_ref()
                     .map(|time_range| start_ts <= *time_range.end())
@@ -500,7 +500,7 @@ fn filter_splits(
         end_ts_opt
             .and_then(|end_ts| {
                 split
-                    .split_metadata
+                    .metadata
                     .time_range
                     .as_ref()
                     .map(|time_range| end_ts >= *time_range.start())
@@ -510,7 +510,7 @@ fn filter_splits(
     let tag_filter = |split: &Split| {
         tag_filter_ast_opt
             .as_ref()
-            .map(|tag_filter_ast| tag_filter_ast.evaluate(&split.split_metadata.tags))
+            .map(|tag_filter_ast| tag_filter_ast.evaluate(&split.metadata.tags))
             .unwrap_or(true)
     };
     splits
@@ -770,7 +770,7 @@ mod tests {
         tags: &[&str],
     ) -> Split {
         Split {
-            split_metadata: SplitMetadata {
+            metadata: SplitMetadata {
                 split_id: split_id.to_string(),
                 footer_offsets: 10..30,
                 time_range,
@@ -781,7 +781,7 @@ mod tests {
                 create_timestamp,
                 ..Default::default()
             },
-            split_state,
+            state: split_state,
             update_timestamp: 1639997968,
         }
     }
@@ -803,7 +803,7 @@ mod tests {
                 None
             )
             .into_iter()
-            .map(|split| split.split_metadata.split_id)
+            .map(|split| split.metadata.split_id)
             .collect::<Vec<_>>(),
             ["one", "two"]
         );
@@ -819,7 +819,7 @@ mod tests {
         assert_eq!(
             filter_splits(splits, None, Some(5), None, None, None)
                 .into_iter()
-                .map(|split| split.split_metadata.split_id)
+                .map(|split| split.metadata.split_id)
                 .collect::<Vec<_>>(),
             ["one", "two"]
         );
@@ -837,7 +837,7 @@ mod tests {
         assert_eq!(
             filter_splits(splits, None, None, Some(10), None, None)
                 .into_iter()
-                .map(|split| split.split_metadata.split_id)
+                .map(|split| split.metadata.split_id)
                 .collect::<Vec<_>>(),
             ["two", "three", "four", "five"]
         );
@@ -855,7 +855,7 @@ mod tests {
         assert_eq!(
             filter_splits(splits, None, None, None, Some(10), None)
                 .into_iter()
-                .map(|split| split.split_metadata.split_id)
+                .map(|split| split.metadata.split_id)
                 .collect::<Vec<_>>(),
             ["one", "two", "three", "four"]
         );
@@ -880,7 +880,7 @@ mod tests {
                 })
             )
             .into_iter()
-            .map(|split| split.split_metadata.split_id)
+            .map(|split| split.metadata.split_id)
             .collect::<Vec<_>>(),
             ["two"]
         );

@@ -181,8 +181,8 @@ impl TestSandbox {
 /// Mock split helper.
 pub fn mock_split(split_id: &str) -> Split {
     Split {
-        split_state: SplitState::Published,
-        split_metadata: mock_split_meta(split_id),
+        state: SplitState::Published,
+        metadata: mock_split_meta(split_id),
         update_timestamp: 0,
     }
 }

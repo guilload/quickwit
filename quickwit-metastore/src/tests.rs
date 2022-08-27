@@ -2085,7 +2085,7 @@ pub mod test_suite {
 
         // Get a non-existent index metadata
         let result = metastore
-            .list_indexes_metadatas()
+            .list_indexes()
             .await
             .unwrap()
             .into_iter()
@@ -2104,7 +2104,7 @@ pub mod test_suite {
 
         // Get list indexes metadata.
         let result = metastore
-            .list_indexes_metadatas()
+            .list_indexes()
             .await
             .unwrap()
             .into_iter()
@@ -2117,7 +2117,7 @@ pub mod test_suite {
 
         // Check that no index is left.
         let result = metastore
-            .list_indexes_metadatas()
+            .list_indexes()
             .await
             .unwrap()
             .into_iter()

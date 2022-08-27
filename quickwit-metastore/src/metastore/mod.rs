@@ -85,7 +85,7 @@ pub trait Metastore: Send + Sync + 'static {
     ///
     /// This API lists the indexes stored in the metastore and returns a collection of
     /// [`IndexMetadata`].
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>>;
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>>;
 
     /// Returns the [`IndexMetadata`] for a given index.
     /// TODO consider merging with list_splits to remove one round-trip

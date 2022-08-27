@@ -137,8 +137,8 @@ impl TryInto<QuickwitSplit> for Split {
         let split_state = self.split_state()?;
         let update_timestamp = self.update_timestamp.assume_utc().unix_timestamp();
         Ok(QuickwitSplit {
-            split_metadata,
-            split_state,
+            metadata: split_metadata,
+            state: split_state,
             update_timestamp,
         })
     }

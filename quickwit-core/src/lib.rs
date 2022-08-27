@@ -58,7 +58,7 @@ mod tests {
             .list_all_splits(index_id)
             .await?
             .into_iter()
-            .map(|metadata| metadata.split_metadata)
+            .map(|metadata| metadata.metadata)
             .collect::<Vec<_>>();
         let file_entries: Vec<FileEntry> = splits.iter().map(FileEntry::from).collect();
         assert_eq!(file_entries.len(), 1);

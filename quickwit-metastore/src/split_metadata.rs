@@ -31,20 +31,20 @@ use crate::VersionedSplitMetadata;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Split {
     /// The state of the split.
-    pub split_state: SplitState,
+    pub state: SplitState,
 
     /// Timestamp for tracking when the split was last updated.
     pub update_timestamp: i64,
 
     /// Immutable part of the split.
     #[serde(flatten)]
-    pub split_metadata: SplitMetadata,
+    pub metadata: SplitMetadata,
 }
 
 impl Split {
     /// Returns the split_id.
     pub fn split_id(&self) -> &str {
-        &self.split_metadata.split_id
+        &self.metadata.split_id
     }
 }
 

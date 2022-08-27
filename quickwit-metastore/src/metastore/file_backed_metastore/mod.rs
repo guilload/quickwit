@@ -477,7 +477,7 @@ impl Metastore for FileBackedMetastore {
             .await
     }
 
-    async fn list_indexes_metadatas(&self) -> MetastoreResult<Vec<IndexMetadata>> {
+    async fn list_indexes(&self) -> MetastoreResult<Vec<IndexMetadata>> {
         let per_index_metastores_rlock = self.per_index_metastores.read().await;
         try_join_all(
             per_index_metastores_rlock
@@ -589,6 +589,7 @@ mod tests {
         let indexes = metastore.list_indexes_metadatas().await.unwrap();
         assert_eq!(indexes.len(), 1);
 
+<<<<<<< HEAD
         // Open a non-existent index.
         let metastore_error = metastore
             .get_index("index-does-not-exist")
@@ -598,6 +599,51 @@ mod tests {
             metastore_error,
             MetastoreError::IndexDoesNotExist { .. }
         ));
+||||||| parent of fd165612 (WIP)
+            // Check for the existence of index.
+            let result = metastore.index_exists(index_id).await.unwrap();
+            let expected = true;
+            assert_eq!(result, expected);
+
+            // Open index and check its metadata
+            let created_index = metastore.get_index(index_id).await.unwrap();
+            assert_eq!(created_index.index_id(), index_metadata.index_id);
+            assert_eq!(created_index.metadata().index_uri, index_metadata.index_uri);
+
+            // Check index is returned by list.
+            let indexes = metastore.list_indexes_metadatas().await.unwrap();
+            assert_eq!(indexes.len(), 1);
+
+            // Open a non-existent index.
+            let metastore_error = metastore.get_index("non-existent-index").await.unwrap_err();
+            assert!(matches!(
+                metastore_error,
+                MetastoreError::IndexDoesNotExist { .. }
+            ));
+        }
+=======
+            // Check for the existence of index.
+            let result = metastore.index_exists(index_id).await.unwrap();
+            let expected = true;
+            assert_eq!(result, expected);
+
+            // Open index and check its metadata
+            let created_index = metastore.get_index(index_id).await.unwrap();
+            assert_eq!(created_index.index_id(), index_metadata.index_id);
+            assert_eq!(created_index.metadata().index_uri, index_metadata.index_uri);
+
+            // Check index is returned by list.
+            let indexes = metastore.list_indexes().await.unwrap();
+            assert_eq!(indexes.len(), 1);
+
+            // Open a non-existent index.
+            let metastore_error = metastore.get_index("non-existent-index").await.unwrap_err();
+            assert!(matches!(
+                metastore_error,
+                MetastoreError::IndexDoesNotExist { .. }
+            ));
+        }
+>>>>>>> fd165612 (WIP)
     }
 
     #[tokio::test]
@@ -1131,10 +1177,16 @@ mod tests {
         .await?;
 
         // Fetch alive indexes metadatas.
+<<<<<<< HEAD
         let metastore = FileBackedMetastore::try_new(ram_storage.clone(), None)
             .await
             .unwrap();
         let indexes_metadatas = metastore.list_indexes_metadatas().await.unwrap();
+||||||| parent of fd165612 (WIP)
+        let indexes_metadatas = metastore.list_indexes_metadatas().await.unwrap();
+=======
+        let indexes_metadatas = metastore.list_indexes().await.unwrap();
+>>>>>>> fd165612 (WIP)
         assert_eq!(indexes_metadatas.len(), 1);
 
         // Fetch the index metadata not registered in indexes states json.
@@ -1142,13 +1194,13 @@ mod tests {
 
         // Now list indexes return 2 indexes metadatas as the metastore is now aware of
         // 2 alive indexes.
-        let indexes_metadatas = metastore.list_indexes_metadatas().await.unwrap();
+        let indexes_metadatas = metastore.list_indexes().await.unwrap();
         assert_eq!(indexes_metadatas.len(), 2);
 
         // Let's delete indexes.
         metastore.delete_index(index_id_alive).await.unwrap();
         metastore.delete_index(index_id_unregistered).await.unwrap();
-        let no_more_indexes = metastore.list_indexes_metadatas().await.unwrap();
+        let no_more_indexes = metastore.list_indexes().await.unwrap();
         assert!(no_more_indexes.is_empty());
 
         Ok(())

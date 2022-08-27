@@ -158,12 +158,12 @@ mod tests {
         split_ids
             .iter()
             .map(|split_id| Split {
-                split_metadata: SplitMetadata {
+                metadata: SplitMetadata {
                     split_id: split_id.to_string(),
                     footer_offsets: 5..20,
                     ..Default::default()
                 },
-                split_state,
+                state: split_state,
                 update_timestamp: 0i64,
             })
             .collect()

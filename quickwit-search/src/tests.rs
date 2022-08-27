@@ -621,8 +621,8 @@ async fn test_search_dynamic_util(test_sandbox: &TestSandbox, query: &str) -> Ve
         .into_iter()
         .map(|split_meta| SplitIdAndFooterOffsets {
             split_id: split_meta.split_id().to_string(),
-            split_footer_start: split_meta.split_metadata.footer_offsets.start,
-            split_footer_end: split_meta.split_metadata.footer_offsets.end,
+            split_footer_start: split_meta.metadata.footer_offsets.start,
+            split_footer_end: split_meta.metadata.footer_offsets.end,
         })
         .collect();
     let request = quickwit_proto::SearchRequest {

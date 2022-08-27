@@ -249,6 +249,7 @@ fn check_is_configured_for_cluster(
              PostgreSQL metastore instead."
         );
     }
+<<<<<<< HEAD
     if let Some((index_id, index_uri)) =
         indexes.find(|(_, index_uri)| index_uri.protocol().is_file())
     {
@@ -258,6 +259,29 @@ fn check_is_configured_for_cluster(
             index_id,
             index_uri,
         );
+||||||| parent of fd165612 (WIP)
+    for index_metadata in metastore.list_indexes_metadatas().await? {
+        let index_uri = Uri::try_new(&index_metadata.index_uri)?;
+        if index_uri.protocol() == FILE_PROTOCOL {
+            anyhow::bail!(
+                "Quickwit cannot run in cluster mode with an index whose data is stored on a \
+                 local file system. Index URI for index `{}` is `{}`.",
+                index_metadata.index_id,
+                index_uri
+            );
+        }
+=======
+    for index_metadata in metastore.list_indexes().await? {
+        let index_uri = Uri::try_new(&index_metadata.index_uri)?;
+        if index_uri.protocol() == FILE_PROTOCOL {
+            anyhow::bail!(
+                "Quickwit cannot run in cluster mode with an index whose data is stored on a \
+                 local file system. Index URI for index `{}` is `{}`.",
+                index_metadata.index_id,
+                index_uri
+            );
+        }
+>>>>>>> fd165612 (WIP)
     }
     Ok(())
 }
