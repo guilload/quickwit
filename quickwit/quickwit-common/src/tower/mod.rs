@@ -24,6 +24,7 @@ mod estimate_rate;
 mod rate;
 mod rate_estimator;
 mod rate_limit;
+mod router;
 
 pub use box_layer::BoxLayer;
 pub use box_service::BoxService;
