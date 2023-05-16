@@ -25,7 +25,7 @@ use quickwit_query::query_ast::QueryAst;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value as JsonValue};
 use tantivy::query::Query;
-use tantivy::schema::{Field, FieldType, Schema, Value as TantivyValue, STORED};
+use tantivy::schema::{Field, FieldType, Schema, Value as TantivyValue, STORED, TextOptions};
 use tantivy::Document;
 
 use super::field_mapping_entry::QuickwitTextTokenizer;
@@ -38,7 +38,7 @@ use crate::query_builder::build_query;
 use crate::routing_expression::RoutingExpr;
 use crate::{
     Cardinality, DocMapper, DocParsingError, ModeType, QueryParserError, WarmupInfo,
-    DYNAMIC_FIELD_NAME, SOURCE_FIELD_NAME,
+    DYNAMIC_FIELD_NAME, SOURCE_FIELD_NAME, SPLIT_ID_TAG_NAME, SOURCE_ID_TAG_NAME,
 };
 
 /// Defines how an unmapped field should be handled.
@@ -94,7 +94,7 @@ pub struct DefaultDocMapper {
     max_num_partitions: NonZeroU32,
     /// List of required fields. Right now this is unused.
     required_fields: Vec<Field>,
-    /// Defines how unmapped fields should be handle.
+    /// Defines how unmapped fields should be handled.
     mode: Mode,
 }
 
@@ -183,6 +183,9 @@ impl TryFrom<DefaultDocMapperBuilder> for DefaultDocMapper {
         } else {
             None
         };
+        // FIXME
+        schema_builder.add_text_field(SPLIT_ID_TAG_NAME, STORED);
+        schema_builder.add_text_field(SOURCE_ID_TAG_NAME, STORED);
 
         validate_timestamp_field_if_any(&builder)?;
 
@@ -198,32 +201,33 @@ impl TryFrom<DefaultDocMapperBuilder> for DefaultDocMapper {
         validate_tag_fields(&builder.tag_fields, &schema)?;
 
         // Resolve default search fields
-        let mut default_search_field_names = Vec::new();
-        for field_name in &builder.default_search_fields {
-            if default_search_field_names.contains(field_name) {
+        let mut default_search_field_names = Vec::with_capacity(builder.default_search_fields.len());
+        for field_name in builder.default_search_fields {
+            if default_search_field_names.contains(&field_name) {
                 bail!("Duplicated default search field: `{}`", field_name)
             }
             schema
-                .get_field(field_name)
+                .get_field(&field_name)
                 .with_context(|| format!("Unknown default search field: `{field_name}`"))?;
-            default_search_field_names.push(field_name.clone());
+            default_search_field_names.push(field_name);
         }
 
         // Resolve tag fields
         let mut tag_field_names: BTreeSet<String> = Default::default();
-        for tag_field_name in &builder.tag_fields {
-            if tag_field_names.contains(tag_field_name) {
+        for tag_field_name in builder.tag_fields {
+            if tag_field_names.contains(&tag_field_name) {
                 bail!("Duplicated tag field: `{}`", tag_field_name)
             }
             schema
-                .get_field(tag_field_name)
+                .get_field(&tag_field_name)
                 .with_context(|| format!("Unknown tag field: `{tag_field_name}`"))?;
-            tag_field_names.insert(tag_field_name.clone());
+            tag_field_names.insert(tag_field_name);
         }
 
         let required_fields = Vec::new();
-        let partition_key = RoutingExpr::new(builder.partition_key.as_deref().unwrap_or(""))
-            .context("Failed to interpret the partition key.")?;
+        let partition_key_expr = builder.partition_key.unwrap_or_default();
+        let partition_key = RoutingExpr::new(&partition_key_expr)
+            .with_context(|| format!("Failed to parse partition key expression: {partition_key_expr}"))?;
         Ok(DefaultDocMapper {
             schema,
             source_field,

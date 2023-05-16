@@ -29,8 +29,10 @@ use itertools::Itertools;
 use quickwit_actors::{Actor, ActorContext, ActorExitStatus, Handler, Mailbox, QueueCapacity};
 use quickwit_common::runtimes::RuntimeType;
 use quickwit_directories::write_hotcache;
-use quickwit_doc_mapper::tag_pruning::append_to_tag_set;
-use quickwit_doc_mapper::NamedField;
+use quickwit_doc_mapper::tag_pruning::{
+    append_to_tag_set
+};
+use quickwit_doc_mapper::{NamedField, SPLIT_ID_TAG_NAME, SOURCE_ID_TAG_NAME};
 use tantivy::schema::FieldType;
 use tantivy::{InvertedIndexReader, ReloadPolicy, SegmentMeta};
 use tokio::runtime::Handle;
@@ -287,6 +289,7 @@ fn create_packaged_split(
         .reload_policy(ReloadPolicy::Manual)
         .try_into()?;
     let mut tags = BTreeSet::default();
+
     for named_field in tag_fields {
         let inverted_indexes = index_reader
             .searcher()
@@ -304,7 +307,17 @@ fn create_packaged_split(
             }
         }
     }
-
+    // Finally, inject `_split_id` and `_source_id` tags.
+    append_to_tag_set(
+        SPLIT_ID_TAG_NAME,
+        &[split.split_id().to_string()],
+        &mut tags,
+    );
+    append_to_tag_set(
+        SOURCE_ID_TAG_NAME,
+        &[split.source_id().to_string()],
+        &mut tags,
+    );
     ctx.record_progress();
 
     debug!(split_id = split.split_id(), "build-hotcache");
@@ -475,6 +488,10 @@ mod tests {
         assert_eq!(
             &split.tags.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
             &[
+                "_source_id!",
+                "_source_id:test-source",
+                "_split_id!",
+                "_split_id:test-split",
                 "tag_bool!",
                 "tag_bool:true",
                 "tag_f64!",

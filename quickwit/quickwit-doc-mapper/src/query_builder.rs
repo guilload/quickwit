@@ -448,4 +448,13 @@ mod test {
         assert!(warmup_info.term_dict_field_names.is_empty());
         assert!(warmup_info.posting_field_names.is_empty());
     }
+
+    #[test]
+    fn test_build_query_split_id_and_source_id_tags() {
+        check_build_query_static_mode(
+            "_split_id:test-split ",
+            Vec::new(),
+            TestExpectation::Err("Expected a `bool` search value for field `server.running`"),
+        );
+    }
 }

@@ -50,6 +50,10 @@ impl IndexedSplit {
     pub fn split_id(&self) -> &str {
         &self.split_attrs.split_id
     }
+
+    pub fn source_id(&self) -> &str {
+        &self.split_attrs.pipeline_id.source_id
+    }
 }
 
 impl fmt::Debug for IndexedSplit {
